@@ -1,3 +1,17 @@
+# OunceShell
+
+OunceShell is VitaShell ported to the Switch 2 as homebrew: a file manager
+with an FTP server, text and hex editors, an image viewer, a music player
+and archive browsing. Build it with the Switch 2 devkit
+([ouncebrew/ounce-devkit](https://github.com/ouncebrew/ounce-devkit)):
+
+```sh
+make -f switch2/Makefile    # -> build/switch2/ounceshell.nro
+```
+
+[switch2/PORT.md](switch2/PORT.md) describes the port. The rest of this file
+is upstream VitaShell's README.
+
 # VitaShell
 
 VitaShell is an alternative replacement of the PS Vita's LiveArea. It offers you a file manager, package installer, built-in FTP and much more.

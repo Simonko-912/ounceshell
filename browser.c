@@ -14,6 +14,11 @@
 
   You should have received a copy of the GNU General Public License
   along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+  Modified for Switch 2: device roots are "sdmc:/", VPK packages open as
+  archives, the Vita-only USB/FTP, QR, ad hoc and core dump features are
+  left out, the browser returns when the system asks the program to exit,
+  and an unreadable last-directory file no longer leaves garbage in the path.
 */
 
 #include "main.h"
@@ -45,6 +50,10 @@
 #include "usb.h"
 #include "qr.h"
 #include "pfs.h"
+
+#ifdef __SWITCH2__
+#include <switch2_platform.h>
+#endif
 
 // File lists
 FileList file_list, mark_list, copy_list, install_list;
@@ -150,6 +159,11 @@ int change_to_directory(char *lastdir) {
     }
     int i;
     for (i = 0; i < strlen(lastdir) + 1; i++) {
+#ifdef __SWITCH2__
+      // A Switch device root is "sdmc:/": its colon and slash are one level.
+      if (lastdir[i] == ':' && lastdir[i + 1] == '/')
+        continue;
+#endif
       if (lastdir[i] == ':' || lastdir[i] == '/') {
         char ch = lastdir[i + 1];
         lastdir[i + 1] = '\0';
@@ -162,6 +176,11 @@ int change_to_directory(char *lastdir) {
           p = strrchr(lastdir, ':');
         if (!p)
           p = lastdir - 1;
+#ifdef __SWITCH2__
+        // Focus the whole device entry "sdmc:/" at the root level.
+        if (*p == ':' && p + 1 == lastdir + i)
+          p = lastdir - 1;
+#endif
 
         lastdir[i] = ch2;
 
@@ -371,6 +390,14 @@ static int handleFile(const char *file, FileListEntry *entry) {
 
   int type = getFileType(file);
 
+#ifdef __SWITCH2__
+  // A VPK is a zip archive; Vita core dumps open in the text/hex viewer.
+  if (type == FILE_TYPE_VPK)
+    type = FILE_TYPE_ARCHIVE;
+  if (type == FILE_TYPE_PSP2DMP)
+    type = FILE_TYPE_UNKNOWN;
+#endif
+
   switch (type) {
     case FILE_TYPE_PSP2DMP:
     case FILE_TYPE_MP3:
@@ -384,9 +411,11 @@ static int handleFile(const char *file, FileListEntry *entry) {
   }
 
   switch (type) {
+#ifndef __SWITCH2__
     case FILE_TYPE_PSP2DMP:
       res = coredumpViewer(file);
       break;
+#endif
       
     case FILE_TYPE_INI:
     case FILE_TYPE_TXT:
@@ -410,10 +439,12 @@ static int handleFile(const char *file, FileListEntry *entry) {
       res = SFOReader(file);
       break;
       
+#ifndef __SWITCH2__
     case FILE_TYPE_VPK:
       initMessageDialog(SCE_MSG_DIALOG_BUTTON_TYPE_YESNO, language_container[INSTALL_QUESTION]);
       setDialogStep(DIALOG_STEP_INSTALL_QUESTION);
       break;
+#endif
       
     case FILE_TYPE_ARCHIVE:
       archiveClearPassword();
@@ -469,12 +500,14 @@ int shortCuts() {
     }
   }
 
+#ifndef __SWITCH2__
   // QR
   if (current_pad[PAD_CIRCLE] && enabledQR()) {
     startQR();
     initMessageDialog(MESSAGE_DIALOG_QR_CODE, language_container[QR_SCANNING]);
     setDialogStep(DIALOG_STEP_QR);
   }
+#endif
 
   return 0;
 }
@@ -493,6 +526,7 @@ static int fileBrowserMenuCtrl() {
 
   // SELECT button
   if (pressed_pad[PAD_SELECT]) {
+#ifndef __SWITCH2__
     if (vitashell_config.select_button == SELECT_BUTTON_MODE_USB &&
         sceKernelGetModel() == SCE_KERNEL_MODEL_VITA) {
       if (isSafeMode()) {
@@ -511,6 +545,11 @@ static int fileBrowserMenuCtrl() {
       }
     } else if (vitashell_config.select_button == SELECT_BUTTON_MODE_FTP ||
                sceKernelGetModel() == SCE_KERNEL_MODEL_VITATV) {
+#else
+    // Modified for Switch 2: SELECT (the - button) starts the FTP server.
+    // There is no USB mode.
+    {
+#endif
       // Init FTP
       if (!ftpvita_is_initialized()) {
         int res = ftpvita_init(vita_ip, &vita_port);
@@ -594,9 +633,12 @@ static int fileBrowserMenuCtrl() {
         setContextMenuMainVisibilities();
         setContextMenuMode(CONTEXT_MENU_OPENING);
       } else {
+        // Switch 2: every 'home' menu entry is a Vita mount or refresh.
+#ifndef __SWITCH2__
         setContextMenu(&context_menu_home);
         setContextMenuHomeVisibilities();
         setContextMenuMode(CONTEXT_MENU_OPENING);
+#endif
       }
     }
   }
@@ -775,6 +817,81 @@ static void fileBrowserHandleSymlink(FileListEntry *file_entry) {
     errorDialog(res);
 }
 
+#ifdef __SWITCH2__
+// Added for Switch 2: a row of button hints under the file list, so that
+// actions such as - (SELECT) starting the FTP server can be found. The
+// symbols are the Nintendo extension font's controller buttons, as in the
+// dialogs (uncommon_dialog.h).
+#define HINT_BUTTON_A "\xEE\x83\xA0"
+#define HINT_BUTTON_B "\xEE\x83\xA1"
+#define HINT_BUTTON_X "\xEE\x83\xA2"
+#define HINT_BUTTON_Y "\xEE\x83\xA3"
+#define HINT_BUTTON_L "\xEE\x83\xA4"
+#define HINT_BUTTON_R "\xEE\x83\xA5"
+#define HINT_BUTTON_PLUS "\xEE\x83\xAF"
+#define HINT_BUTTON_MINUS "\xEE\x83\xB0"
+
+// Space between a button and its action, and between two hints.
+#define HINT_BUTTON_SPACE 6.0f
+#define HINT_SPACE 26.0f
+
+// The bar behind the hints, from below the file list (which ends at 478)
+// to the bottom of the screen.
+#define HINT_BAR_TOP 484.0f
+
+// A theme with a browser background but no CONTROL_HINTS_BAR_COLOR most
+// likely paints the Vita's button legend there; this bar covers it.
+#define HINT_BAR_FALLBACK_COLOR 0xD0000000
+
+typedef struct {
+  const char *button;
+  const char *action;
+} ControlHint;
+
+static int browserHasFocus(void) {
+  return getDialogStep() == DIALOG_STEP_NONE &&
+         getPropertyDialogStatus() == PROPERTY_DIALOG_CLOSED &&
+         getSettingsMenuStatus() == SETTINGS_MENU_CLOSED &&
+         getContextMenuMode() == CONTEXT_MENU_CLOSED;
+}
+
+static void drawControlHints(void) {
+  // The "Confirm button" setting swaps A and B.
+  int a_confirms = enter_button == SCE_SYSTEM_PARAM_ENTER_BUTTON_CIRCLE;
+
+  const ControlHint hints[] = {
+    { a_confirms ? HINT_BUTTON_A : HINT_BUTTON_B, "Open" },
+    { a_confirms ? HINT_BUTTON_B : HINT_BUTTON_A, "Back" },
+    { HINT_BUTTON_X, "Menu" },
+    { HINT_BUTTON_Y, "Mark" },
+    { HINT_BUTTON_L "/" HINT_BUTTON_R, "Page" },
+    { HINT_BUTTON_PLUS, "Settings" },
+    { HINT_BUTTON_MINUS, ftpvita_is_initialized() ? "FTP server (on)" : "FTP server" },
+  };
+
+  // A custom theme's background can paint the Vita's own button legend
+  // here, so draw the hints on a bar of their own.
+  unsigned int bar_color = (unsigned int)CONTROL_HINTS_BAR_COLOR;
+  if ((bar_color >> 24) == 0 && bg_browser_image)
+    bar_color = HINT_BAR_FALLBACK_COLOR;
+  if ((bar_color >> 24) != 0)
+    vita2d_draw_rectangle(0.0f, HINT_BAR_TOP, SCREEN_WIDTH, SCREEN_HEIGHT - HINT_BAR_TOP, bar_color);
+
+  // Below the last row of the file list, in the space it leaves free.
+  float y = SCREEN_HEIGHT - SHELL_MARGIN_Y - FONT_Y_SPACE;
+  float x = SHELL_MARGIN_X;
+
+  int i;
+  for (i = 0; i < (int)(sizeof(hints) / sizeof(hints[0])); i++) {
+    pgf_draw_text(x, y, DATE_TIME_COLOR, hints[i].button);
+    x += pgf_text_width(hints[i].button) + HINT_BUTTON_SPACE;
+
+    pgf_draw_text(x, y, PATH_COLOR, hints[i].action);
+    x += pgf_text_width(hints[i].action) + HINT_SPACE;
+  }
+}
+#endif
+
 int browserMain() {
   // Position
   memset(base_pos_list, 0, sizeof(base_pos_list));
@@ -796,7 +913,8 @@ int browserMain() {
   if (use_custom_config) {
     // Last dir
     char lastdir[MAX_PATH_LENGTH];
-    ReadFile(VITASHELL_LASTDIR, lastdir, sizeof(lastdir));
+    memset(lastdir, 0, sizeof(lastdir));
+    ReadFile(VITASHELL_LASTDIR, lastdir, sizeof(lastdir) - 1);
     change_to_directory(lastdir);
   }
 
@@ -809,14 +927,22 @@ int browserMain() {
   while (1) {
     readPad();
 
+#ifdef __SWITCH2__
+    // HOME's "close software": nested viewers have already returned.
+    if (switch2QuitRequested())
+      break;
+#endif
+
     int refresh = REFRESH_MODE_NONE;
 
     // Control
     if (getDialogStep() != DIALOG_STEP_NONE) {
       refresh = dialogSteps();
       // scroll_count = 0;
+#ifndef __SWITCH2__
     } else if (getAdhocDialogStatus() != ADHOC_DIALOG_CLOSED) {
       adhocDialogCtrl();
+#endif
     } else if (getPropertyDialogStatus() != PROPERTY_DIALOG_CLOSED) {
       propertyDialogCtrl();
       scroll_count = 0;
@@ -828,6 +954,7 @@ int browserMain() {
       refresh = fileBrowserMenuCtrl();
     }
 
+#ifndef __SWITCH2__
     // Receive system event
     SceAppMgrSystemEvent event;
     sceAppMgrReceiveSystemEvent(&event);
@@ -838,6 +965,7 @@ int browserMain() {
       pfsUmount(); // umount game data at resume
       refresh = REFRESH_MODE_NORMAL;
     }
+#endif
     if (refresh != REFRESH_MODE_NONE) {
       // Refresh lists
       refreshFileList();
@@ -855,6 +983,10 @@ int browserMain() {
     // Draw
     drawShellInfo(file_list.path);
     drawScrollBar(base_pos, file_list.length);
+#ifdef __SWITCH2__
+    if (browserHasFocus())
+      drawControlHints();
+#endif
 
     // Draw
     FileListEntry *file_entry = fileListGetNthEntry(&file_list, base_pos);
@@ -1024,7 +1156,9 @@ int browserMain() {
     // Draw
     drawSettingsMenu();
     drawContextMenu();
+#ifndef __SWITCH2__
     drawAdhocDialog();
+#endif
     drawPropertyDialog();
 
     // End drawing

@@ -14,6 +14,11 @@
 
   You should have received a copy of the GNU General Public License
   along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+  Modified for Switch 2: the status bar shows the Switch battery, and the
+  Vita-only dialog steps (FTP, USB, LiveArea and license refresh, package
+  installation, media export, updates, QR codes and ad hoc transfer) are
+  left out.
 */
 
 #include "main.h"
@@ -48,14 +53,20 @@
 #include "qr.h"
 #include "pfs.h"
 
+#ifdef __SWITCH2__
+#include <switch2_platform.h>
+#else
 int _newlib_heap_size_user = 128 * 1024 * 1024;
+#endif
 
 static volatile int dialog_step = DIALOG_STEP_NONE;
 
 static char install_path[MAX_PATH_LENGTH];
 static char compress_name[MAX_NAME_LENGTH];
 
+#ifndef __SWITCH2__
 static SceUID usbdevice_modid = -1;
+#endif
 
 static SceKernelLwMutexWork dialog_mutex;
 
@@ -100,12 +111,44 @@ void drawShellInfo(const char *path) {
   if (version[3] == '0')
     version[3] = '\0';
 
+#ifdef __SWITCH2__
+  // Modified for Switch 2: the port is named OunceShell.
+  (void)version;
+  pgf_draw_text(SHELL_MARGIN_X, SHELL_MARGIN_Y, TITLE_COLOR, "OunceShell");
+#else
   pgf_draw_textf(SHELL_MARGIN_X, SHELL_MARGIN_Y, TITLE_COLOR, "VitaShell %s", version);
+#endif
 
   // Status bar
   float x = SCREEN_WIDTH - SHELL_MARGIN_X;
 
   // Battery
+#ifdef __SWITCH2__
+  Switch2BatteryState battery;
+  if (switch2GetBatteryState(&battery) == 0) {
+    float battery_x = ALIGN_RIGHT(x, vita2d_texture_get_width(battery_image));
+    vita2d_draw_texture(battery_image, battery_x, SHELL_MARGIN_Y + 3.0f);
+
+    vita2d_texture *battery_bar_image = battery_bar_green_image;
+
+    if (battery.percent <= 15 && !battery.charging) {
+      battery_bar_image = battery_bar_red_image;
+    }
+
+    float percent = battery.percent / 100.0f;
+
+    float width = vita2d_texture_get_width(battery_bar_image);
+    vita2d_draw_texture_part(battery_bar_image, battery_x + 3.0f + (1.0f - percent) * width,
+                             SHELL_MARGIN_Y + 5.0f, (1.0f - percent) * width, 0.0f, percent * width,
+                             vita2d_texture_get_height(battery_bar_image));
+
+    if (battery.charging) {
+      vita2d_draw_texture(battery_bar_charge_image, battery_x + 3.0f, SHELL_MARGIN_Y + 5.0f);
+    }
+
+    x = battery_x - STATUS_BAR_SPACE_X;
+  }
+#else
   if (sceKernelGetModel() == SCE_KERNEL_MODEL_VITA) {
     float battery_x = ALIGN_RIGHT(x, vita2d_texture_get_width(battery_image));
     vita2d_draw_texture(battery_image, battery_x, SHELL_MARGIN_Y + 3.0f);
@@ -129,6 +172,7 @@ void drawShellInfo(const char *path) {
 
     x = battery_x - STATUS_BAR_SPACE_X;
   }
+#endif
 
   // Date & time
   SceDateTime time;
@@ -151,7 +195,7 @@ void drawShellInfo(const char *path) {
   if (ftpvita_is_initialized()) {
     float ftp_x = ALIGN_RIGHT(x, vita2d_texture_get_width(ftp_image));
     vita2d_draw_texture(ftp_image, ftp_x, SHELL_MARGIN_Y + 3.0f);
-    
+
     x = ftp_x - STATUS_BAR_SPACE_X;
   }
 
@@ -180,8 +224,12 @@ void drawShellInfo(const char *path) {
 
   // home (SAFE/UNSAFE MODE)
   if (strcmp(path_first_line, HOME_PATH) == 0) {    
+#ifdef __SWITCH2__
+    pgf_draw_text(SHELL_MARGIN_X, PATH_Y, PATH_COLOR, HOME_PATH);
+#else
     pgf_draw_textf(SHELL_MARGIN_X, PATH_Y, PATH_COLOR, "%s (%s)", HOME_PATH,
                    isSafeMode() ? language_container[SAFE_MODE] : language_container[UNSAFE_MODE]);
+#endif
   } else {
     // Path
     pgf_draw_text(SHELL_MARGIN_X, PATH_Y, PATH_COLOR, path_first_line);
@@ -195,16 +243,32 @@ void initFtp() {
   for (i = 0; i < getNumberOfDevices(); i++) {
     char **devices = getDevices();
     if (devices[i]) {
+#ifdef __SWITCH2__
+      // Modified for Switch 2: the device is "sdmc:/", but ftpvita takes a
+      // name without the slash ("sdmc:") and shows the device as /sdmc:/.
+      char name[32];
+      snprintf(name, sizeof(name), "%s", devices[i]);
+      size_t length = strlen(name);
+      if (length > 0 && name[length - 1] == '/')
+        name[length - 1] = '\0';
+
+      ftpvita_add_device(name);
+#else
       if (isSafeMode() && strcmp(devices[i], "ux0:") != 0)
         continue;
 
       ftpvita_add_device(devices[i]);
+#endif
     }
   }
 
+#ifndef __SWITCH2__
+  // Package installation through the Vita's promoter.
   ftpvita_ext_add_custom_command("PROM", ftpvita_PROM);
+#endif
 }
 
+#ifndef __SWITCH2__
 void initUsb() {
   char *path = NULL;
 
@@ -248,12 +312,15 @@ void initUsb() {
     errorDialog(usbdevice_modid);
   }
 }
+#endif
 
 int dialogSteps() {
   int refresh = REFRESH_MODE_NONE;
 
   int msg_result = updateMessageDialog();
+#ifndef __SWITCH2__
   int netcheck_result = updateNetCheckDialog();
+#endif
   int ime_result = updateImeDialog();
 
   switch (getDialogStep()) {
@@ -359,6 +426,7 @@ int dialogSteps() {
       break;
     }
     
+#ifndef __SWITCH2__
     case DIALOG_STEP_REFRESH_LIVEAREA_QUESTION:
     {
       if (msg_result == MESSAGE_DIALOG_RESULT_YES) {
@@ -416,6 +484,9 @@ int dialogSteps() {
       break;
     }
     
+#endif
+
+    // Modified for Switch 2: the FTP server (ftpvita) is kept.
     case DIALOG_STEP_FTP_WAIT:
     {
       if (msg_result == MESSAGE_DIALOG_RESULT_RUNNING) {
@@ -461,6 +532,7 @@ int dialogSteps() {
       break;
     }
     
+#ifndef __SWITCH2__
     case DIALOG_STEP_USB_WAIT:
     {
       if (msg_result == MESSAGE_DIALOG_RESULT_RUNNING) {
@@ -505,6 +577,7 @@ int dialogSteps() {
 
       break;
     }
+#endif
     
     case DIALOG_STEP_PASTE:
     {
@@ -555,6 +628,7 @@ int dialogSteps() {
       break;
     }
     
+#ifndef __SWITCH2__
     case DIALOG_STEP_EXPORT_QUESTION:
     {
       if (msg_result == MESSAGE_DIALOG_RESULT_YES) {
@@ -584,6 +658,7 @@ int dialogSteps() {
 
       break;
     }
+#endif
     
     case DIALOG_STEP_RENAME:
     {
@@ -781,6 +856,7 @@ int dialogSteps() {
       break;
     }
     
+#ifndef __SWITCH2__
     case DIALOG_STEP_INSTALL_QUESTION:
     {
       if (msg_result == MESSAGE_DIALOG_RESULT_YES) {
@@ -890,6 +966,7 @@ int dialogSteps() {
 
       break;
     }
+#endif
     
     case DIALOG_STEP_SETTINGS_AGREEMENT:
     {
@@ -923,6 +1000,7 @@ int dialogSteps() {
       break;
     }
     
+#ifndef __SWITCH2__
     case DIALOG_STEP_EXTRACTED:
     {
 			removePath("ux0:patch/VITASHELL", NULL);
@@ -1018,6 +1096,7 @@ int dialogSteps() {
       
       break;
     }
+#endif
     
     case DIALOG_STEP_ENTER_PASSWORD:
     {
@@ -1055,6 +1134,7 @@ int dialogSteps() {
       break;
     }
     
+#ifndef __SWITCH2__
     case DIALOG_STEP_ADHOC_SEND_NETCHECK:
     {
       if (netcheck_result == NETCHECK_DIALOG_RESULT_CONNECTED) {
@@ -1213,11 +1293,13 @@ int dialogSteps() {
       
       break;
     }
+#endif
   }
 
   return refresh;
 }
 
+#ifndef __SWITCH2__
 void ftpvita_PROM(ftpvita_client_info_t *client) {
   char cmd[64];
   char path[MAX_PATH_LENGTH];
@@ -1229,6 +1311,7 @@ void ftpvita_PROM(ftpvita_client_info_t *client) {
     ftpvita_ext_client_send_ctrl_msg(client, "500 ERROR PROMOTING\r\n");
   }
 }
+#endif
 
 int main(int argc, const char *argv[]) {  
   // Create mutex
@@ -1251,12 +1334,14 @@ int main(int argc, const char *argv[]) {
   initContextMenuWidth();
   initTextContextMenuWidth();
   
+#ifndef __SWITCH2__
   // Automatic network update
   if (!vitashell_config.disable_autoupdate) {
     SceUID thid = sceKernelCreateThread("network_update_thread", network_update_thread, 0x10000100, 0x100000, 0, 0, NULL);
     if (thid >= 0)
       sceKernelStartThread(thid, 0, NULL);
   }
+#endif
 
   // File browser
   browserMain();

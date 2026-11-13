@@ -5,6 +5,7 @@ BACKGROUND_COLOR             = 0xFF000000    # Black
 TITLE_COLOR                  = 0xFFFF007F    # Violet
 PATH_COLOR                   = 0xFFBFBFBF    # Litegray
 DATE_TIME_COLOR              = 0xFFFFFFFF    # White
+CONTROL_HINTS_BAR_COLOR      = 0x00000000    # None (Switch 2 button hints)
 
 # Settings colors
 SETTINGS_MENU_COLOR          = 0xE0000000    # Black with alpha

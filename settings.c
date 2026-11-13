@@ -14,6 +14,9 @@
 
   You should have received a copy of the GNU General Public License
   along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+  Modified for Switch 2: the settings are the theme, the confirm button and
+  the system keyboard; 'Power' offers only leaving VitaShell.
 */
 
 #include "main.h"
@@ -26,10 +29,16 @@
 #include "ime_dialog.h"
 #include "utils.h"
 
+#ifdef __SWITCH2__
+#include <switch2_platform.h>
+
+static void exitShell();
+#else
 static void restartShell();
 static void rebootDevice();
 static void shutdownDevice();
 static void suspendDevice();
+#endif
 
 static int changed = 0;
 static int theme = 0;
@@ -39,24 +48,44 @@ static char spoofed_version[6];
 static SettingsMenuEntry *settings_menu_entries = NULL;
 static int n_settings_entries = 0;
 
+#ifdef __SWITCH2__
+// The Switch's A and B button symbols
+static char *enter_button_options[] = { "\xEE\x83\xA0", "\xEE\x83\xA1" };
+#else
 static char *usbdevice_options[4];
 static char *select_button_options[2];
+#endif
 
 static char **theme_options = NULL;
 static int theme_count = 0;
 static char *theme_name = NULL;
 
 static ConfigEntry settings_entries[] = {
+#ifdef __SWITCH2__
+  { "ENTER_BUTTON",       CONFIG_TYPE_DECIMAL, (int *)&vitashell_config.enter_button },
+#else
   { "USBDEVICE",          CONFIG_TYPE_DECIMAL, (int *)&vitashell_config.usbdevice },
   { "SELECT_BUTTON",      CONFIG_TYPE_DECIMAL, (int *)&vitashell_config.select_button },
   { "DISABLE_AUTOUPDATE", CONFIG_TYPE_BOOLEAN, (int *)&vitashell_config.disable_autoupdate },
   { "DISABLE_WARNING",    CONFIG_TYPE_BOOLEAN, (int *)&vitashell_config.disable_warning },
+#endif
 };
 
 static ConfigEntry theme_entries[] = {
   { "THEME_NAME", CONFIG_TYPE_STRING, (void *)&theme_name },
 };
 
+#ifdef __SWITCH2__
+SettingsMenuOption main_settings[] = {
+  { VITASHELL_SETTINGS_THEME,           SETTINGS_OPTION_TYPE_OPTIONS, NULL, NULL, 0, NULL, 0, NULL },
+  { VITASHELL_SETTINGS_ENTER_BUTTON,    SETTINGS_OPTION_TYPE_OPTIONS, NULL, NULL, 0,
+    enter_button_options, sizeof(enter_button_options) / sizeof(char **), &vitashell_config.enter_button },
+};
+
+SettingsMenuOption power_settings[] = {
+  { VITASHELL_SETTINGS_EXIT, SETTINGS_OPTION_TYPE_CALLBACK, (void *)exitShell, NULL, 0, NULL, 0, NULL },
+};
+#else
 SettingsMenuOption main_settings[] = {
   // { VITASHELL_SETTINGS_LANGUAGE,     SETTINGS_OPTION_TYPE_BOOLEAN, NULL, NULL, 0, NULL, 0, &language },
   { VITASHELL_SETTINGS_THEME,           SETTINGS_OPTION_TYPE_OPTIONS, NULL, NULL, 0, NULL, 0, NULL },
@@ -76,6 +105,7 @@ SettingsMenuOption power_settings[] = {
   { VITASHELL_SETTINGS_POWEROFF,  SETTINGS_OPTION_TYPE_CALLBACK, (void *)shutdownDevice, NULL, 0, NULL, 0, NULL },
   { VITASHELL_SETTINGS_STANDBY,   SETTINGS_OPTION_TYPE_CALLBACK, (void *)suspendDevice, NULL, 0, NULL, 0, NULL },
 };
+#endif
 
 SettingsMenuEntry vitashell_settings_menu_entries[] = {
   { VITASHELL_SETTINGS_MAIN,  main_settings,  sizeof(main_settings) / sizeof(SettingsMenuOption) },
@@ -84,21 +114,44 @@ SettingsMenuEntry vitashell_settings_menu_entries[] = {
 
 static SettingsMenu settings_menu;
 
+#ifdef __SWITCH2__
+static void applyEnterButton() {
+  enter_button = vitashell_config.enter_button ? SCE_SYSTEM_PARAM_ENTER_BUTTON_CROSS
+                                               : SCE_SYSTEM_PARAM_ENTER_BUTTON_CIRCLE;
+}
+#endif
+
 void loadSettingsConfig() {
   // Load settings config file
   memset(&vitashell_config, 0, sizeof(VitaShellConfig));
-  readConfig("ux0:VitaShell/settings.txt", settings_entries, sizeof(settings_entries) / sizeof(ConfigEntry));
+  readConfig(VITASHELL_DATA_PATH "settings.txt", settings_entries, sizeof(settings_entries) / sizeof(ConfigEntry));
+
+#ifdef __SWITCH2__
+  if (vitashell_config.enter_button < 0 || vitashell_config.enter_button > 1)
+    vitashell_config.enter_button = 0;
+  applyEnterButton();
+#endif
 }
 
 void saveSettingsConfig() {
   // Save settings config file
-  writeConfig("ux0:VitaShell/settings.txt", settings_entries, sizeof(settings_entries) / sizeof(ConfigEntry));
+  writeConfig(VITASHELL_DATA_PATH "settings.txt", settings_entries, sizeof(settings_entries) / sizeof(ConfigEntry));
 
+#ifdef __SWITCH2__
+  applyEnterButton();
+#else
   if (sceKernelGetModel() == SCE_KERNEL_MODEL_VITATV) {
     vitashell_config.select_button = SELECT_BUTTON_MODE_FTP;
   }
+#endif
 }
 
+#ifdef __SWITCH2__
+static void exitShell() {
+  closeSettingsMenu();
+  switch2RequestExit();
+}
+#else
 static void restartShell() {
   closeSettingsMenu();
   sceAppMgrLoadExec("app0:eboot.bin", NULL, NULL);
@@ -118,6 +171,7 @@ static void suspendDevice() {
   closeSettingsMenu();
   scePowerRequestSuspend();
 }
+#endif
 
 void initSettingsMenu() {
   int i;
@@ -131,6 +185,7 @@ void initSettingsMenu() {
   for (i = 0; i < n_settings_entries; i++)
     settings_menu.n_options += settings_menu_entries[i].n_options;
 
+#ifndef __SWITCH2__
   usbdevice_options[0] = language_container[VITASHELL_SETTINGS_USB_MEMORY_CARD];
   usbdevice_options[1] = language_container[VITASHELL_SETTINGS_USB_GAME_CARD];
   usbdevice_options[2] = language_container[VITASHELL_SETTINGS_USB_SD2VITA];
@@ -138,6 +193,7 @@ void initSettingsMenu() {
 
   select_button_options[0] = language_container[VITASHELL_SETTINGS_SELECT_BUTTON_USB];
   select_button_options[1] = language_container[VITASHELL_SETTINGS_SELECT_BUTTON_FTP];
+#endif
   
   theme_options = malloc(MAX_THEMES * sizeof(char *));
   
@@ -154,7 +210,7 @@ void openSettingsMenu() {
   if (theme_name)
     free(theme_name);
 
-  readConfig("ux0:VitaShell/theme/theme.txt", theme_entries, sizeof(theme_entries) / sizeof(ConfigEntry));
+  readConfig(VITASHELL_DATA_PATH "theme/theme.txt", theme_entries, sizeof(theme_entries) / sizeof(ConfigEntry));
 
   // Get theme index in main tab
   int theme_index = -1;
@@ -169,7 +225,7 @@ void openSettingsMenu() {
 
   // Find all themes
   if (theme_index >= 0) {
-    SceUID dfd = sceIoDopen("ux0:VitaShell/theme");
+    SceUID dfd = sceIoDopen(VITASHELL_DATA_PATH "theme");
     if (dfd >= 0) {
       theme_count = 0;
       theme = 0;
@@ -212,7 +268,7 @@ void closeSettingsMenu() {
       
     // Save theme config file
     theme_entries[0].value = &theme_options[theme];
-    writeConfig("ux0:VitaShell/theme/theme.txt", theme_entries, sizeof(theme_entries) / sizeof(ConfigEntry));
+    writeConfig(VITASHELL_DATA_PATH "theme/theme.txt", theme_entries, sizeof(theme_entries) / sizeof(ConfigEntry));
     theme_entries[0].value = (void *)&theme_name;
   }
 }

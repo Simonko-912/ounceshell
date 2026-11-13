@@ -15,6 +15,8 @@
 //    You should have received a copy of the GNU General Public License
 //    along with this program; if not, write to the Free Software
 //    Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
+//
+//    Modified for Switch 2: times from libvorbis are in seconds.
 #include <psp2/io/fcntl.h>
 #include <psp2/kernel/threadmgr.h>
 #include <string.h>
@@ -81,7 +83,8 @@ static void oggDecodeThread(void *_buf2, unsigned int numSamples, void *pdata){
             OGG_tempmixleft += ret / 4;    // back down to sample num
         }
         OGG_info.instantBitrate = ov_bitrate_instant(&OGG_VorbisFile);
-        OGG_milliSeconds = ov_time_tell(&OGG_VorbisFile);
+        // libvorbis reports seconds (Tremor, which this code was written for, milliseconds)
+        OGG_milliSeconds = ov_time_tell(&OGG_VorbisFile) * 1000.0;
 
         if (OGG_newFilePos >= 0)
         {
@@ -272,7 +275,8 @@ void OGGgetInfo(){
     OGG_info.kbit = vi->bitrate_nominal/1000;
     OGG_info.instantBitrate = vi->bitrate_nominal;
     OGG_info.hz = vi->rate;
-    OGG_info.length = (long)ov_time_total(&OGG_VorbisFile, -1)/1000;
+    // Seconds: libvorbis's ov_time_total already is (Tremor's is milliseconds)
+    OGG_info.length = (long)ov_time_total(&OGG_VorbisFile, -1);
     if (vi->channels == 1){
         strcpy(OGG_info.mode, "single channel");
         OGG_channels = 1;

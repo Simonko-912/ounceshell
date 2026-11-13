@@ -14,6 +14,8 @@
 
   You should have received a copy of the GNU General Public License
   along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+  Modified for Switch 2: pointer arithmetic is 64-bit safe.
 */
 
 #include "main.h"
@@ -30,7 +32,7 @@
 
 int getSfoValue(void *buffer, const char *name, uint32_t *value) {
   SfoHeader *header = (SfoHeader *)buffer;
-  SfoEntry *entries = (SfoEntry *)((uint32_t)buffer + sizeof(SfoHeader));
+  SfoEntry *entries = (SfoEntry *)((uintptr_t)buffer + sizeof(SfoHeader));
 
   if (header->magic != SFO_MAGIC)
     return VITASHELL_ERROR_INVALID_MAGIC;
@@ -48,7 +50,7 @@ int getSfoValue(void *buffer, const char *name, uint32_t *value) {
 
 int getSfoString(void *buffer, const char *name, char *string, int length) {
   SfoHeader *header = (SfoHeader *)buffer;
-  SfoEntry *entries = (SfoEntry *)((uint32_t)buffer + sizeof(SfoHeader));
+  SfoEntry *entries = (SfoEntry *)((uintptr_t)buffer + sizeof(SfoHeader));
 
   if (header->magic != SFO_MAGIC)
     return VITASHELL_ERROR_INVALID_MAGIC;
@@ -68,7 +70,7 @@ int getSfoString(void *buffer, const char *name, char *string, int length) {
 
 int setSfoValue(void *buffer, const char *name, uint32_t value) {
   SfoHeader *header = (SfoHeader *)buffer;
-  SfoEntry *entries = (SfoEntry *)((uint32_t)buffer + sizeof(SfoHeader));
+  SfoEntry *entries = (SfoEntry *)((uintptr_t)buffer + sizeof(SfoHeader));
 
   if (header->magic != SFO_MAGIC)
     return VITASHELL_ERROR_INVALID_MAGIC;
@@ -86,7 +88,7 @@ int setSfoValue(void *buffer, const char *name, uint32_t value) {
 
 int setSfoString(void *buffer, const char *name, const char *string) {
   SfoHeader *header = (SfoHeader *)buffer;
-  SfoEntry *entries = (SfoEntry *)((uint32_t)buffer + sizeof(SfoHeader));
+  SfoEntry *entries = (SfoEntry *)((uintptr_t)buffer + sizeof(SfoHeader));
 
   if (header->magic != SFO_MAGIC)
     return VITASHELL_ERROR_INVALID_MAGIC;

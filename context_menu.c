@@ -39,6 +39,29 @@ void setContextMenuMode(int mode) {
   ctx_menu_mode = mode;
 }
 
+#ifdef __SWITCH2__
+/* Added for Switch 2: hidden entries (the Vita-only actions) take no row.
+   The rows below a hidden entry move up, and so does a submenu opened from
+   such a row; the blank rows between groups stay. */
+static int hiddenRowsBefore(const ContextMenu *ctx, int pos) {
+  int count = 0;
+  int i;
+  for (i = 0; i < ctx->n_entries; i++) {
+    if (ctx->entries[i].visibility == CTX_HIDDEN && ctx->entries[i].pos < pos)
+      count++;
+  }
+  return count;
+}
+
+static int entryRow(const ContextMenu *ctx, int i) {
+  int row = ctx->entries[i].pos - hiddenRowsBefore(ctx, ctx->entries[i].pos);
+  const ContextMenu *parent = ctx->parent;
+  if (parent && parent->sel >= 0)
+    row -= hiddenRowsBefore(parent, parent->entries[parent->sel].pos);
+  return row;
+}
+#endif
+
 void drawContextMenu() {
   if (!cur_ctx)
     return;
@@ -97,7 +120,13 @@ void drawContextMenu() {
 
     int i;
     for (i = 0; i < ctx->n_entries; i++) {
+#ifdef __SWITCH2__
+      if (ctx->entries[i].visibility == CTX_HIDDEN)
+        continue;
+      float y = START_Y + (entryRow(ctx, i) * FONT_Y_SPACE);
+#else
       float y = START_Y + (ctx->entries[i].pos * FONT_Y_SPACE);
+#endif
 
       uint32_t color = CONTEXT_MENU_TEXT_COLOR;
 
@@ -132,7 +161,13 @@ void drawContextMenu() {
         ctx_menu_mode == CONTEXT_MENU_MORE_OPENED ||
         ctx_menu_mode == CONTEXT_MENU_MORE_OPENING) {
       for (i = 0; i < cur_ctx->n_entries; i++) {
+#ifdef __SWITCH2__
+        if (cur_ctx->entries[i].visibility == CTX_HIDDEN)
+          continue;
+        float y = START_Y + (entryRow(cur_ctx, i) * FONT_Y_SPACE);
+#else
         float y = START_Y + (cur_ctx->entries[i].pos * FONT_Y_SPACE);
+#endif
 
         uint32_t color = CONTEXT_MENU_TEXT_COLOR;
 

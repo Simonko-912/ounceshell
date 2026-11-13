@@ -14,6 +14,9 @@
 
   You should have received a copy of the GNU General Public License
   along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+  Modified for Switch 2: no Vita power ticks, shell locks, app launching or
+  device mounts; the debug log is in VitaShell's data folder.
 */
 
 #include "main.h"
@@ -125,6 +128,7 @@ int checkMemoryCardFreeSpace(const char *path, uint64_t size) {
   return 0;
 }
 
+#ifndef __SWITCH2__
 static int power_tick_thread(SceSize args, void *argp) {
   while (1) {
     if (lock_power > 0) {
@@ -142,17 +146,26 @@ void initPowerTickThread() {
   if (thid >= 0)
     sceKernelStartThread(thid, 0, NULL);
 }
+#else
+// Switch 2: auto-sleep is not held off during long operations (not ported).
+void initPowerTickThread() {
+}
+#endif
 
 void powerLock() {
+#ifndef __SWITCH2__
   if (!lock_power)
     sceShellUtilLock(SCE_SHELL_UTIL_LOCK_TYPE_PS_BTN);
+#endif
 
   lock_power++;
 }
 
 void powerUnlock() {
+#ifndef __SWITCH2__
   if (lock_power)
     sceShellUtilUnlock(SCE_SHELL_UTIL_LOCK_TYPE_PS_BTN);
+#endif
 
   lock_power--;
   if (lock_power < 0)
@@ -407,7 +420,11 @@ int debugPrintf(const char *text, ...) {
   vsnprintf(string, sizeof(string), text, list);
   va_end(list);
 
+#ifdef __SWITCH2__
+  SceUID fd = sceIoOpen(VITASHELL_DATA_PATH "debug_log.txt", SCE_O_WRONLY | SCE_O_CREAT | SCE_O_APPEND, 0777);
+#else
   SceUID fd = sceIoOpen("ux0:data/vitashell_log.txt", SCE_O_WRONLY | SCE_O_CREAT | SCE_O_APPEND, 0777);
+#endif
   if (fd >= 0) {
     sceIoWrite(fd, string, strlen(string));
     sceIoClose(fd);
@@ -416,6 +433,7 @@ int debugPrintf(const char *text, ...) {
   return 0;
 }
 
+#ifndef __SWITCH2__
 int launchAppByUriExit(const char *titleid) {
   char uri[32];
   snprintf(uri, sizeof(uri), "psgm:play?titleid=%s", titleid);
@@ -425,11 +443,13 @@ int launchAppByUriExit(const char *titleid) {
 
   return 0;
 }
+#endif
 
 char *strcasestr(const char *haystack, const char *needle) {
   return boyer_moore(haystack, needle);
 }
 
+#ifndef __SWITCH2__
 int vshIoMount(int id, const char *path, int permission, int a4, int a5, int a6) {
   uint32_t buf[3];
 
@@ -445,3 +465,4 @@ void remount(int id) {
   vshIoUmount(id, 1, 0, 0);
   vshIoMount(id, NULL, 0, 0, 0, 0);
 }
+#endif

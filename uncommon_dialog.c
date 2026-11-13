@@ -14,6 +14,8 @@
 
   You should have received a copy of the GNU General Public License
   along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+  Modified for Switch 2: no QR camera view.
 */
 
 #include "main.h"
@@ -372,10 +374,12 @@ int drawUncommonDialog() {
       string_y += 2.0f * FONT_Y_SPACE;
     }
     
+#ifndef __SWITCH2__
     if (uncommon_dialog.mode == MSG_DIALOG_MODE_QR_SCAN) {
       renderCameraQR(uncommon_dialog.x + 15, string_y + 10);
       string_y += CAM_HEIGHT;
     }
+#endif
 
     switch (uncommon_dialog.buttonType) {
       case SCE_MSG_DIALOG_BUTTON_TYPE_OK:

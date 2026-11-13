@@ -14,6 +14,8 @@
 
   You should have received a copy of the GNU General Public License
   along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+  Modified for Switch 2: the Switch 2 settings strings.
 */
 
 #ifndef __LANGUAGE_H__
@@ -195,6 +197,8 @@ enum LanguageContainer {
   VITASHELL_SETTINGS_USB_PSVSD,
   VITASHELL_SETTINGS_SELECT_BUTTON_USB,
   VITASHELL_SETTINGS_SELECT_BUTTON_FTP,
+  VITASHELL_SETTINGS_ENTER_BUTTON,
+  VITASHELL_SETTINGS_EXIT,
 
   // USB strings
   USB_CONNECTED,

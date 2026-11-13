@@ -14,6 +14,9 @@
 
   You should have received a copy of the GNU General Public License
   along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+  Modified for Switch 2: no PSARC archives (they need the Vita's FIOS) and
+  no Vita executable checks.
 */
 
 #include "main.h"
@@ -24,16 +27,22 @@
 #include "utils.h"
 #include "elf.h"
 
+#ifdef __SWITCH2__
+static const int is_psarc = 0;
+#else
 static int is_psarc = 0;
+#endif
 static char archive_file[MAX_PATH_LENGTH];
 static int archive_path_start = 0;
 struct archive *archive_fd = NULL;
 static int need_password = 0;
 static char password[128];
 
+#ifndef __SWITCH2__
 int checkForUnsafeImports(const Elf32_Ehdr *ehdr, const Elf32_Phdr *phdr, void *buffer);
 char *uncompressBuffer(const Elf32_Ehdr *ehdr, const Elf32_Phdr *phdr, const segment_info *segment,
                        const char *buffer);
+#endif
 
 void waitpid() {}
 void __archive_create_child() {}
@@ -413,6 +422,7 @@ void freeArchiveNodes(ArchiveFileNode *curr) {
   }
 }
 
+#ifndef __SWITCH2__
 int archiveCheckFilesForUnsafeFself() {  
   // Open archive file
   struct archive *archive = open_archive(archive_file);
@@ -502,6 +512,7 @@ int archiveCheckFilesForUnsafeFself() {
   archive_read_free(archive);
   return 0;
 }
+#endif
 
 int fileListGetArchiveEntries(FileList *list, const char *path, int sort) {
   if (is_psarc)
@@ -635,7 +646,7 @@ int extractArchiveFile(const char *src_path, const char *dst_path, FileProcessPa
 
   SceUID fddst = sceIoOpen(dst_path, SCE_O_WRONLY | SCE_O_CREAT | SCE_O_TRUNC, 0777);
   if (fddst < 0) {
-    psarcFileClose(fdsrc);
+    archiveFileClose(fdsrc);
     return fddst;
   }
 
@@ -891,12 +902,14 @@ int archiveOpen(const char *file) {
   if (read < 0)
     return read;
   
+#ifndef __SWITCH2__
   // PSARC file
   is_psarc = 0;
   if (magic == 0x52415350) {
     is_psarc = 1;
     return psarcOpen(file);
   }
+#endif
   
   // Start position of the archive path
   archive_path_start = strlen(file) + 1;

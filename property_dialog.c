@@ -14,6 +14,8 @@
 
   You should have received a copy of the GNU General Public License
   along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+  Modified for Switch 2: pointer arithmetic is 64-bit safe.
 */
 
 #include "main.h"
@@ -202,7 +204,7 @@ int initPropertyDialog(char *path, FileListEntry *entry) {
     type = PROPERTY_TYPE_FSELF;
 
     // Check authid flag
-    uint64_t authid = *(uint64_t *)((uint32_t)buffer + 0x80);
+    uint64_t authid = *(uint64_t *)((uintptr_t)buffer + 0x80);
     if (authid == 0x2F00000000000001 || authid == 0x2F00000000000003) {      
       width = copyStringGetWidth(property_fself_mode, language_container[PROPERTY_FSELF_MODE_UNSAFE]);
     } else if (authid == 0x2F00000000000002) {

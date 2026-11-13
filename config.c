@@ -14,6 +14,8 @@
 
   You should have received a copy of the GNU General Public License
   along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+  Modified for Switch 2: string values are stored as whole pointers (64-bit).
 */
 
 #include "main.h"
@@ -178,7 +180,7 @@ static int readEntry(const char *line, ConfigEntry *entries, int n_entries) {
         {
           char *value = getString(string);
           if (value) {
-            *(uint32_t *)entries[i].value = (uint32_t)value;
+            *(char **)entries[i].value = value;
             // debugPrintf("VALUE STRING: %s\n", *(uint32_t *)entries[i].value);
           }
 

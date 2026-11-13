@@ -14,15 +14,26 @@
 
   You should have received a copy of the GNU General Public License
   along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+  Modified for Switch 2: the button names are the Switch's button symbols.
 */
 
 #ifndef __UNCOMMON_DIALOG_H__
 #define __UNCOMMON_DIALOG_H__
 
+#ifdef __SWITCH2__
+// The Switch buttons in the Vita buttons' positions (Nintendo extension
+// font): cross = B, square = Y, triangle = X, circle = A.
+#define CROSS "\xEE\x83\xA1"
+#define SQUARE "\xEE\x83\xA3"
+#define TRIANGLE "\xEE\x83\xA2"
+#define CIRCLE "\xEE\x83\xA0"
+#else
 #define CROSS "\xE2\x95\xB3"
 #define SQUARE "\xE2\x96\xA1"
 #define TRIANGLE "\xE2\x96\xB3"
 #define CIRCLE "\xE2\x97\x8B"
+#endif
 
 enum UncommonDialogStatus {
   UNCOMMON_DIALOG_CLOSED,

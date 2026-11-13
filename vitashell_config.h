@@ -14,6 +14,8 @@
 
   You should have received a copy of the GNU General Public License
   along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+  Modified for Switch 2: the confirm button and system keyboard settings.
 */
 
 #ifndef __VITASHELL_CONFIGURATION_H__
@@ -36,6 +38,8 @@ typedef struct {
   int select_button;
   int disable_autoupdate;
   int disable_warning;
+  // Switch 2: 0 if A confirms (the Vita's circle), 1 if B does (cross)
+  int enter_button;
 } VitaShellConfig;
 
 #endif

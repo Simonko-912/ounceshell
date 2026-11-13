@@ -14,6 +14,9 @@
 
   You should have received a copy of the GNU General Public License
   along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+  Modified for Switch 2: no media export to the Vita's music, video and
+  photo apps.
 */
 
 #include "main.h"
@@ -371,6 +374,7 @@ EXIT_ARCHIVE_OPEN:
   return sceKernelExitDeleteThread(0);
 }
 
+#ifndef __SWITCH2__
 static int mediaPathHandler(const char *path) {
   // Avoid export-ception
   if (strncasecmp(path, "ux0:music/", 10) == 0 ||
@@ -661,6 +665,7 @@ EXIT:
 
   return sceKernelExitDeleteThread(0);
 }
+#endif
 
 int hash_thread(SceSize args_size, HashArguments *args) {
   SceUID thid = -1;

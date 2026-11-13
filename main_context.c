@@ -14,6 +14,9 @@
 
   You should have received a copy of the GNU General Public License
   along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+  Modified for Switch 2: the 'home' menu's Vita mount and refresh entries,
+  ad hoc transfer, package installation and media export are hidden.
 */
 
 #include "main.h"
@@ -45,6 +48,13 @@ enum MenuHomeEntrys {
   MENU_HOME_ENTRY_MOUNT_GAMECARD_UX0,
   MENU_HOME_ENTRY_UMOUNT_GAMECARD_UX0,
 };
+
+#ifdef __SWITCH2__
+// Modified for Switch 2: Vita-only actions are hidden (context_menu.h).
+#define VITA_ONLY CTX_HIDDEN
+#else
+#define VITA_ONLY CTX_INVISIBLE
+#endif
 
 MenuEntry menu_home_entries[] = {
   { REFRESH_LIVEAREA,     0, 0, CTX_INVISIBLE },
@@ -80,7 +90,7 @@ enum MenuMainEntrys {
 };
 
 MenuEntry menu_main_entries[] = {
-  { OPEN_DECRYPTED, 0, 0, CTX_INVISIBLE },
+  { OPEN_DECRYPTED, 0, 0, VITA_ONLY },
   { MARK_ALL,       1, 0, CTX_INVISIBLE },
   { MOVE,           3, 0, CTX_INVISIBLE },
   { COPY,           4, 0, CTX_INVISIBLE },
@@ -91,7 +101,7 @@ MenuEntry menu_main_entries[] = {
   { NEW,            12, CTX_FLAG_MORE, CTX_VISIBLE },
   { SORT_BY,        13, CTX_FLAG_MORE, CTX_VISIBLE },
   { MORE,           14, CTX_FLAG_MORE, CTX_INVISIBLE },
-  { ADHOC_TRANSFER, 16, CTX_FLAG_MORE, CTX_INVISIBLE },
+  { ADHOC_TRANSFER, 16, CTX_FLAG_MORE, VITA_ONLY },
   { BOOKMARKS,      17, CTX_FLAG_MORE, CTX_INVISIBLE },
 };
 
@@ -145,9 +155,9 @@ enum MenuMoreEntrys {
 
 MenuEntry menu_more_entries[] = {
   { COMPRESS,       14, 0, CTX_INVISIBLE },
-  { INSTALL_ALL,    15, 0, CTX_INVISIBLE },
-  { INSTALL_FOLDER, 16, 0, CTX_INVISIBLE },
-  { EXPORT_MEDIA,   17, 0, CTX_INVISIBLE },
+  { INSTALL_ALL,    15, 0, VITA_ONLY },
+  { INSTALL_FOLDER, 16, 0, VITA_ONLY },
+  { EXPORT_MEDIA,   17, 0, VITA_ONLY },
   { CALCULATE_SHA1, 18, 0, CTX_INVISIBLE },
 };
 
@@ -251,6 +261,10 @@ void initContextMenuWidth() {
 
   // Main
   for (i = 0; i < N_MENU_MAIN_ENTRIES; i++) {
+#ifdef __SWITCH2__
+    if (menu_main_entries[i].visibility == CTX_HIDDEN)
+      continue;
+#endif
     context_menu_main.max_width = MAX(context_menu_main.max_width,
         pgf_text_width(language_container[menu_main_entries[i].name]));
 
@@ -273,6 +287,10 @@ void initContextMenuWidth() {
 
   // More
   for (i = 0; i < N_MENU_MORE_ENTRIES; i++) {
+#ifdef __SWITCH2__
+    if (menu_more_entries[i].visibility == CTX_HIDDEN)
+      continue;
+#endif
     context_menu_more.max_width = MAX(context_menu_more.max_width, pgf_text_width(language_container[menu_more_entries[i].name]));
   }
 
@@ -311,6 +329,11 @@ void initContextMenuWidth() {
 void setContextMenuHomeVisibilities() {
   int i;
 
+#ifdef __SWITCH2__
+  // Every 'home' entry mounts or refreshes a Vita device.
+  for (i = 0; i < N_MENU_HOME_ENTRIES; i++)
+    menu_home_entries[i].visibility = CTX_INVISIBLE;
+#else
   // All visible
   for (i = 0; i < N_MENU_HOME_ENTRIES; i++) {
     if (menu_home_entries[i].visibility == CTX_INVISIBLE)
@@ -362,6 +385,7 @@ void setContextMenuHomeVisibilities() {
   // Invisible if not mounted
   if (!checkFolderExist("xmc0:"))
     menu_home_entries[MENU_HOME_ENTRY_UMOUNT_XMC0].visibility = CTX_INVISIBLE;
+#endif
 
   // Go to first entry
   for (i = 0; i < N_MENU_HOME_ENTRIES; i++) {
@@ -440,6 +464,13 @@ void setContextMenuMainVisibilities() {
     if (!checkFolderExist(path))
       menu_main_entries[MENU_MAIN_ENTRY_OPEN_DECRYPTED].visibility = CTX_INVISIBLE;
   }
+
+#ifdef __SWITCH2__
+  // No ad hoc transfer or decrypted PFS mounts on Switch 2. Last, so that the
+  // checks above do not turn them back into disabled entries.
+  menu_main_entries[MENU_MAIN_ENTRY_ADHOC].visibility = CTX_HIDDEN;
+  menu_main_entries[MENU_MAIN_ENTRY_OPEN_DECRYPTED].visibility = CTX_HIDDEN;
+#endif
 
   // Go to first entry
   for (i = 0; i < N_MENU_MAIN_ENTRIES; i++) {
@@ -621,6 +652,13 @@ void setContextMenuMoreVisibilities() {
     menu_more_entries[MENU_MORE_ENTRY_EXPORT_MEDIA].visibility = CTX_INVISIBLE;
   }
 
+#ifdef __SWITCH2__
+  // Vita package installation and media export to the Vita's apps
+  menu_more_entries[MENU_MORE_ENTRY_INSTALL_ALL].visibility = CTX_HIDDEN;
+  menu_more_entries[MENU_MORE_ENTRY_INSTALL_FOLDER].visibility = CTX_HIDDEN;
+  menu_more_entries[MENU_MORE_ENTRY_EXPORT_MEDIA].visibility = CTX_HIDDEN;
+#endif
+
   // Go to first entry
   for (i = 0; i < N_MENU_MORE_ENTRIES; i++) {
     if (menu_more_entries[i].visibility == CTX_VISIBLE) {
@@ -670,6 +708,7 @@ void setContextMenuNewVisibilities() {
 }
 
 static int contextMenuHomeEnterCallback(int sel, void *context) {
+#ifndef __SWITCH2__
   switch (sel) {
     case MENU_HOME_ENTRY_REFRESH_LIVEAREA:
     {
@@ -826,6 +865,7 @@ static int contextMenuHomeEnterCallback(int sel, void *context) {
       break;
     }
   }
+#endif
 
   return CONTEXT_MENU_CLOSING;
 }
@@ -1122,6 +1162,7 @@ static int contextMenuBookmarksEnterCallback(int sel, void *context) {
 }
 
 static int contextMenuAdhocEnterCallback(int sel, void *context) {
+#ifndef __SWITCH2__
   switch(sel) {
     case MENU_ADHOC_RECEIVE: {
       initNetCheckDialog(SCE_NETCHECK_DIALOG_MODE_PSP_ADHOC_CONN, 0);
@@ -1134,6 +1175,7 @@ static int contextMenuAdhocEnterCallback(int sel, void *context) {
     }
     break;
   }
+#endif
   return CONTEXT_MENU_CLOSING;
 }
 

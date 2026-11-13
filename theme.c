@@ -14,6 +14,9 @@
 
   You should have received a copy of the GNU General Public License
   along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+  Modified for Switch 2: themes live under VitaShell's data folder, and the
+  embedded resource size comes from its end symbol (64-bit).
 */
 
 #include "main.h"
@@ -49,6 +52,10 @@ int BACKGROUND_COLOR;
 int TITLE_COLOR;
 int PATH_COLOR;
 int DATE_TIME_COLOR;
+#ifdef __SWITCH2__
+// Added for Switch 2: the bar behind the button hints (browser.c).
+int CONTROL_HINTS_BAR_COLOR;
+#endif
 
 // Settings color
 int SETTINGS_MENU_COLOR;
@@ -172,6 +179,9 @@ void loadTheme() {
     COLOR_ENTRY(TITLE_COLOR),
     COLOR_ENTRY(PATH_COLOR),
     COLOR_ENTRY(DATE_TIME_COLOR),
+#ifdef __SWITCH2__
+    COLOR_ENTRY(CONTROL_HINTS_BAR_COLOR),
+#endif
 
     // Settings colors
     COLOR_ENTRY(SETTINGS_MENU_COLOR),
@@ -236,7 +246,7 @@ void loadTheme() {
   int i;
 
   // Load default config file
-  readConfigBuffer(&_binary_resources_default_colors_txt_start, (int)&_binary_resources_default_colors_txt_size,
+  readConfigBuffer(&_binary_resources_default_colors_txt_start, RESOURCE_SIZE(default_colors_txt),
                    colors_entries, sizeof(colors_entries) / sizeof(ConfigEntry));
 
   // Load custom config file
@@ -249,20 +259,20 @@ void loadTheme() {
     };
 
     // Load theme config
-    readConfig("ux0:VitaShell/theme/theme.txt", theme_entries, sizeof(theme_entries) / sizeof(ConfigEntry));
+    readConfig(VITASHELL_DATA_PATH "theme/theme.txt", theme_entries, sizeof(theme_entries) / sizeof(ConfigEntry));
 
     if (theme_name) {
       // Load colors config
-      snprintf(path, MAX_PATH_LENGTH, "ux0:VitaShell/theme/%s/colors.txt", theme_name);
+      snprintf(path, MAX_PATH_LENGTH, VITASHELL_DATA_PATH "theme/%s/colors.txt", theme_name);
       readConfig(path, colors_entries, sizeof(colors_entries) / sizeof(ConfigEntry));
       
       // Font
-      snprintf(path, MAX_PATH_LENGTH, "ux0:VitaShell/theme/%s/font.pgf", theme_name);
+      snprintf(path, MAX_PATH_LENGTH, VITASHELL_DATA_PATH "theme/%s/font.pgf", theme_name);
       font = vita2d_load_custom_pgf(path);
       
       // Load theme
       for (i = 0; i < N_THEME_IMAGES; i++) {
-        snprintf(path, MAX_PATH_LENGTH, "ux0:VitaShell/theme/%s/%s", theme_name, theme_images[i].name);
+        snprintf(path, MAX_PATH_LENGTH, VITASHELL_DATA_PATH "theme/%s/%s", theme_name, theme_images[i].name);
         if (theme_images[i].texture && *(theme_images[i].texture) == NULL)
           *(theme_images[i].texture) = vita2d_load_PNG_file(path);
       }

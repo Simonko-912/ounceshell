@@ -8,3 +8,5 @@
 *.sfo
 *.velf
 build
+/build/
+__pycache__/

@@ -14,6 +14,9 @@
 
   You should have received a copy of the GNU General Public License
   along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+  Modified for Switch 2: Vita-only headers and the FTP hook are left out,
+  and the data folder is sdmc:/switch/ounceshell/ (the port is OunceShell).
 */
 
 #ifndef __MAIN_H__
@@ -40,17 +43,25 @@
 #include <zlib.h>
 
 #include <vita2d.h>
+
 #include <ftpvita.h>
 
+#ifndef __SWITCH2__
 #include <taihen.h>
 
 #include <vitashell_user.h>
+#endif
 
 #include "file.h"
 #include "vitashell_config.h"
 #include "vitashell_error.h"
 
 #define INCLUDE_EXTERN_RESOURCE(name) extern unsigned char _binary_resources_##name##_start; extern unsigned char _binary_resources_##name##_size; \
+  extern unsigned char _binary_resources_##name##_end;
+
+// The size from the end symbol: the absolute _size symbol is not usable in a
+// position-independent (64-bit) executable.
+#define RESOURCE_SIZE(name) ((int)(&_binary_resources_##name##_end - &_binary_resources_##name##_start))
 
 // VitaShell version major.minor
 #define VITASHELL_VERSION_MAJOR 0x02
@@ -58,11 +69,18 @@
 
 #define VITASHELL_VERSION ((VITASHELL_VERSION_MAJOR << 0x18) | (VITASHELL_VERSION_MINOR << 0x10))
 
-#define VITASHELL_LASTDIR "ux0:VitaShell/internal/lastdir.txt"
+// VitaShell's data folder, with the trailing slash
+#ifdef __SWITCH2__
+#define VITASHELL_DATA_PATH "sdmc:/switch/ounceshell/"
+#else
+#define VITASHELL_DATA_PATH "ux0:VitaShell/"
+#endif
+
+#define VITASHELL_LASTDIR VITASHELL_DATA_PATH "internal/lastdir.txt"
 
 // needs / at the end
-#define VITASHELL_BOOKMARKS_PATH "ux0:VitaShell/bookmarks/"
-#define VITASHELL_RECENT_PATH "ux0:VitaShell/recent/"
+#define VITASHELL_BOOKMARKS_PATH VITASHELL_DATA_PATH "bookmarks/"
+#define VITASHELL_RECENT_PATH VITASHELL_DATA_PATH "recent/"
 #define VITASHELL_RECENT_PATH_DELETE_INTERVAL_DAYS 14
 
 #define VITASHELL_TITLEID "VITASHELL"
@@ -267,11 +285,15 @@ void setDialogStep(int step);
 int dialogSteps();
 
 void initFtp();
+#ifndef __SWITCH2__
 void initUsb();
+#endif
 
 void drawScrollBar(int pos, int n);
 void drawShellInfo(const char *path);
 
+#ifndef __SWITCH2__
 void ftpvita_PROM(ftpvita_client_info_t *client);
+#endif
 
 #endif

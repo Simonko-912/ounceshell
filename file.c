@@ -14,6 +14,8 @@
 
   You should have received a copy of the GNU General Public License
   along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+  Modified for Switch 2: the device list is the SD card ("sdmc:/").
 */
 
 #include "main.h"
@@ -25,6 +27,13 @@
 #include "sha1.h"
 #include "strnatcmp.h"
 
+#ifdef __SWITCH2__
+// The SD card. A device name ends in ":/" so that "sdmc:/" + "switch/"
+// forms a proper path.
+static char *devices[] = {
+    "sdmc:/",
+};
+#else
 static char *devices[] = {
     "gro0:",
     "grw0:",
@@ -43,6 +52,7 @@ static char *devices[] = {
     "xmc0:",
     "host0:",
 };
+#endif
 
 #define N_DEVICES (sizeof(devices) / sizeof(char **))
 

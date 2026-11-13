@@ -25,6 +25,10 @@
 enum ContextMenuVisibilities {
   CTX_INVISIBLE,
   CTX_VISIBLE,
+#ifdef __SWITCH2__
+  // Added for Switch 2: not drawn and takes no row (context_menu.c).
+  CTX_HIDDEN,
+#endif
 };
 
 enum ContextMenuFlags {

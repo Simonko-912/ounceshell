@@ -14,6 +14,9 @@
 
   You should have received a copy of the GNU General Public License
   along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+  Modified for Switch 2: the data folder path, the embedded resource size
+  from its end symbol (64-bit), and the Switch 2 settings strings.
 */
 
 #include "main.h"
@@ -236,6 +239,8 @@ void loadLanguage(int id) {
     LANGUAGE_ENTRY(VITASHELL_SETTINGS_USB_PSVSD),
     LANGUAGE_ENTRY(VITASHELL_SETTINGS_SELECT_BUTTON_USB),
     LANGUAGE_ENTRY(VITASHELL_SETTINGS_SELECT_BUTTON_FTP),
+    LANGUAGE_ENTRY(VITASHELL_SETTINGS_ENTER_BUTTON),
+    LANGUAGE_ENTRY(VITASHELL_SETTINGS_EXIT),
 
     // USB strings
     LANGUAGE_ENTRY(USB_CONNECTED),
@@ -285,14 +290,14 @@ void loadLanguage(int id) {
   };
 
   // Load default config file
-  readConfigBuffer(&_binary_resources_english_us_txt_start, (int)&_binary_resources_english_us_txt_size,
+  readConfigBuffer(&_binary_resources_english_us_txt_start, RESOURCE_SIZE(english_us_txt),
                    language_entries, sizeof(language_entries) / sizeof(ConfigEntry));
 
   // Load custom config file
   if (use_custom_config) {
     if (id >= 0 && id < (sizeof(lang) / sizeof(char *))) {
       char path[MAX_PATH_LENGTH];
-      snprintf(path, MAX_PATH_LENGTH, "ux0:VitaShell/language/%s.txt", lang[id]);
+      snprintf(path, MAX_PATH_LENGTH, VITASHELL_DATA_PATH "language/%s.txt", lang[id]);
       readConfig(path, language_entries, sizeof(language_entries) / sizeof(ConfigEntry));
     }
   }

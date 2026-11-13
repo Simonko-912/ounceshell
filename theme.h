@@ -24,6 +24,9 @@ extern int BACKGROUND_COLOR;
 extern int TITLE_COLOR;
 extern int PATH_COLOR;
 extern int DATE_TIME_COLOR;
+#ifdef __SWITCH2__
+extern int CONTROL_HINTS_BAR_COLOR;
+#endif
 
 // Settings colors
 extern int SETTINGS_MENU_COLOR;
