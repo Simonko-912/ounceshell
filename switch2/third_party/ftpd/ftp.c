@@ -16,6 +16,9 @@
 #include <malloc.h>
 #include <math.h>
 #include <netinet/in.h>
+#ifdef __SWITCH2__
+#include <netinet/tcp.h>
+#endif
 #include <poll.h>
 #include <stdarg.h>
 #include <stdio.h>
@@ -341,6 +344,109 @@ ftp_set_socket_nonblocking(int fd)
   return 0;
 }
 
+#ifdef __SWITCH2__
+/*! Modified for OunceShell (Switch 2): send small writes at once.
+ *
+ *  Without it, the last small packet of a listing or of a reply waited for
+ *  the client's delayed acknowledgement (40 ms on Linux, up to 200 ms on
+ *  Windows), so every transfer and listing cost that much.
+ *
+ *  @param[in] fd socket
+ */
+static void
+ftp_set_socket_nodelay(int fd)
+{
+  int yes = 1;
+  if(setsockopt(fd, IPPROTO_TCP, TCP_NODELAY, &yes, sizeof(yes)) != 0)
+    console_print(RED "setsockopt: TCP_NODELAY %d %s\n" RESET, errno, strerror(errno));
+}
+#endif
+
+#ifdef __SWITCH2__
+/*! Modified for OunceShell (Switch 2): converts a file system timestamp to
+ *  UTC as libounce's stat() does (fsdev_converttimetoutc in
+ *  nx/source/runtime/devices/fs_dev.c, ISC), so that listings show the
+ *  same times.
+ *
+ *  @param[in] timestamp file system timestamp (local time)
+ *
+ *  @returns POSIX time
+ */
+static time_t
+ftp_switch2_convert_time(u64 timestamp)
+{
+  time_t           posixtime = (time_t)timestamp;
+  struct tm        *t = gmtime(&posixtime);
+  TimeCalendarTime caltime;
+  u64              utc;
+
+  caltime.year   = 1900 + t->tm_year;
+  caltime.month  = 1 + t->tm_mon;
+  caltime.day    = t->tm_mday;
+  caltime.hour   = t->tm_hour;
+  caltime.minute = t->tm_min;
+  caltime.second = t->tm_sec;
+  if(R_SUCCEEDED(timeToPosixTimeWithMyRule(&caltime, &utc, 1, NULL)))
+    posixtime = (time_t)utc;
+
+  return posixtime;
+}
+
+/*! Modified for OunceShell (Switch 2): fills a directory entry's stat from
+ *  the entry that readdir() read, as ftpd does on the 3DS.
+ *
+ *  stat() asks the console's file service for the type, opens the entry,
+ *  reads its size, closes it and reads its timestamps, then converts three
+ *  times with the time service: eight requests per file, which made a
+ *  listing take about 0.7 ms per entry. The directory read already holds
+ *  the type and the size; only the modification time is requested, and
+ *  only for files (stat() gives directories no times).
+ *
+ *  @param[in]  dp       directory being listed
+ *  @param[in]  path     the entry's path
+ *  @param[in]  getmtime whether to read the modification time
+ *  @param[out] st       stat to fill
+ *
+ *  @returns 0, or -1 when dp is not a file system directory
+ */
+static int
+ftp_switch2_entry_stat(DIR        *dp,
+                       const char *path,
+                       bool       getmtime,
+                       struct stat *st)
+{
+  fsdev_dir_t      *dir = (fsdev_dir_t*)dp->dirData->dirStruct;
+  FsDirectoryEntry *entry;
+  FsFileSystem     *fs;
+  char             fs_path[FS_MAX_PATH];
+  FsTimeStampRaw   timestamps = {0};
+
+  if(dir->magic != FSDEV_DIRITER_MAGIC)
+    return -1;
+
+  entry = &fsdevDirGetEntries(dir)[dir->index];
+
+  memset(st, 0, sizeof(*st));
+  st->st_nlink = 1;
+  if(entry->type == FsDirEntryType_Dir)
+  {
+    st->st_mode = S_IFDIR | S_IRWXU | S_IRWXG | S_IRWXO;
+    return 0;
+  }
+
+  st->st_mode = S_IFREG | S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP | S_IROTH | S_IWOTH;
+  st->st_size = (off_t)entry->file_size;
+
+  if(getmtime
+  && fsdevTranslatePath(path, &fs, fs_path) != -1
+  && R_SUCCEEDED(fsFsGetFileTimeStampRaw(fs, fs_path, &timestamps))
+  && timestamps.is_valid)
+    st->st_mtime = ftp_switch2_convert_time(timestamps.modified);
+
+  return 0;
+}
+#endif
+
 /*! set socket options
  *
  *  @param[in] fd socket
@@ -369,6 +475,10 @@ ftp_set_socket_options(int fd)
     console_print(RED "setsockopt: SO_SNDBUF %d %s\n" RESET, errno, strerror(errno));
     return -1;
   }
+
+#ifdef __SWITCH2__
+  ftp_set_socket_nodelay(fd);
+#endif
 
   return 0;
 }
@@ -1234,6 +1344,10 @@ ftp_session_new(int listen_fd)
     return;
   }
 
+#ifdef __SWITCH2__
+  ftp_set_socket_nodelay(new_fd);
+#endif
+
   /* initialize session */
   strcpy(session->cwd, "/");
   session->peer_addr.sin_addr.s_addr = INADDR_ANY;
@@ -1322,6 +1436,9 @@ ftp_session_accept(ftp_session_t *session)
 
     /* we are ready to transfer data */
     ftp_session_set_state(session, DATA_TRANSFER_STATE, CLOSE_PASV);
+#ifdef __SWITCH2__
+    ftp_set_socket_nodelay(new_fd);
+#endif
     session->data_fd = new_fd;
 
     return 0;
@@ -2442,6 +2559,18 @@ list_transfer(ftp_session_t *session)
       /* lstat the entry */
       if((rc = build_path(session, session->lwd, dent->d_name)) != 0)
         console_print(RED "build_path: %d %s\n" RESET, errno, strerror(errno));
+#ifdef __SWITCH2__
+      /* Modified for OunceShell (Switch 2): the directory entry already has
+       * the type and size (see ftp_switch2_entry_stat). */
+      else if(ftp_switch2_entry_stat(session->dp, session->buffer,
+                                     /* as on the 3DS: MLSD and MLST give the
+                                      * time only when asked to */
+                                     (session->dir_mode != XFER_DIR_MLSD
+                                      && session->dir_mode != XFER_DIR_MLST)
+                                     || (session->mlst_flags & SESSION_MLST_MODIFY),
+                                     &st) == 0)
+        rc = 0;
+#endif
       else if((rc = lstat(session->buffer, &st)) != 0)
         console_print(RED "stat '%s': %d %s\n" RESET, session->buffer, errno, strerror(errno));
 
