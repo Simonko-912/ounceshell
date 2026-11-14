@@ -238,34 +238,24 @@ void drawShellInfo(const char *path) {
 }
 
 void initFtp() {
+#ifndef __SWITCH2__
   // Add all the current mountpoints to ftpvita
   int i;
   for (i = 0; i < getNumberOfDevices(); i++) {
     char **devices = getDevices();
     if (devices[i]) {
-#ifdef __SWITCH2__
-      // Modified for Switch 2: the device is "sdmc:/", but ftpvita takes a
-      // name without the slash ("sdmc:") and shows the device as /sdmc:/.
-      char name[32];
-      snprintf(name, sizeof(name), "%s", devices[i]);
-      size_t length = strlen(name);
-      if (length > 0 && name[length - 1] == '/')
-        name[length - 1] = '\0';
-
-      ftpvita_add_device(name);
-#else
       if (isSafeMode() && strcmp(devices[i], "ux0:") != 0)
         continue;
 
       ftpvita_add_device(devices[i]);
-#endif
     }
   }
 
-#ifndef __SWITCH2__
   // Package installation through the Vita's promoter.
   ftpvita_ext_add_custom_command("PROM", ftpvita_PROM);
 #endif
+  // Modified for Switch 2: the FTP server (ftpd's) serves the SD card at
+  // its root; there are no devices to add.
 }
 
 #ifndef __SWITCH2__

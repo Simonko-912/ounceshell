@@ -48,7 +48,7 @@ UPSTREAM_SOURCES := \
 
 # This port's platform layer, its replacements for init.c, ime_dialog.c and
 # audio/vita_audio.c, and the FTP server VitaShell starts with SELECT
-# (vendored, unchanged).
+# (ftpd's, vendored, serving the SD card at its root).
 PORT_SOURCES := \
 	switch2/src/psp2_io.c switch2/src/psp2_kernel.c \
 	switch2/src/psp2_rtc.c switch2/src/psp2_ctrl.c \
@@ -56,7 +56,7 @@ PORT_SOURCES := \
 	switch2/src/vita2d_font.c switch2/src/ime_dialog.c \
 	switch2/src/vita_audio_sdl.c switch2/src/init.c \
 	switch2/src/dropped_features.c switch2/src/psp2_net.c \
-	switch2/third_party/ftpvita/ftpvita.c
+	switch2/src/ftp_server.c switch2/third_party/ftpd/ftp.c
 
 # Linked in as _binary_<path>_start/_end, paths relative to the root.
 RESOURCES := \
@@ -77,7 +77,7 @@ CFLAGS := -std=gnu11 -O2 -funsigned-char $(ARCH) \
 	-Wall -Wno-unused-variable -Wno-unused-but-set-variable \
 	-Wno-format-truncation \
 	-D__SWITCH__ -D__SWITCH2__ -D_REENTRANT \
-	-Iswitch2/include -Iswitch2/third_party/ftpvita -iquote . \
+	-Iswitch2/include -Iswitch2/third_party/ftpd -iquote . \
 	-I$(PORTLIBS_SWITCH2)/include -isystem $(LIBOUNCE)/include \
 	-I$(PORTLIBS)/include/SDL2 -I$(PORTLIBS)/include
 
