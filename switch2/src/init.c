@@ -180,6 +180,7 @@ void initVitaShell() {
 
   switch2CtrlInit();
   switch2PowerInit();
+  switch2MountNand();
 
   installDefaultFiles();
   cleanRecentFiles();

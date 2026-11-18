@@ -28,6 +28,7 @@
  */
 
 #include <vitasdk.h>
+#include <switch.h>
 
 #include <dirent.h>
 #include <errno.h>
@@ -66,6 +67,21 @@ static void normalizePath(const char *path, char *out, size_t out_size) {
   } else {
     snprintf(out, out_size, "%s", path);
   }
+}
+
+/* Mount the built-in user storage (the NAND) as the fsdev device "nand",
+ * so the browser and the FTP server see it next to the SD card ("sdmc").
+ * The libounce runtime mounts "sdmc" itself at startup; the built-in
+ * storage needs a separate mount: the fs service opens it as the user
+ * content storage (the storage Switch 2 installs games and saves to),
+ * and fsdev gives it a stdio name. Without it, or when opening fails,
+ * OunceShell simply runs on the SD card alone. The runtime's own
+ * shutdown (fsdevUnmountAll) unmounts it again. */
+void switch2MountNand(void) {
+  FsFileSystem fs;
+  Result rc = fsOpenContentStorageFileSystem(&fs, FsContentStorageId_User);
+  if (R_SUCCEEDED(rc))
+    fsdevMountDevice("nand", fs);
 }
 
 /* True for "dev:/" and "dev:", which stat may not describe. */

@@ -15,7 +15,8 @@
   You should have received a copy of the GNU General Public License
   along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-  Modified for Switch 2: the device list is the SD card ("sdmc:/").
+  Modified for Switch 2: the device list is the SD card ("sdmc:/") and the
+  built-in user storage ("nand:/").
 */
 
 #include "main.h"
@@ -28,10 +29,12 @@
 #include "strnatcmp.h"
 
 #ifdef __SWITCH2__
-// The SD card. A device name ends in ":/" so that "sdmc:/" + "switch/"
-// forms a proper path.
+// The SD card and the built-in user storage (the NAND, mounted as the fsdev
+// device "nand" by switch2MountNand). A device name ends in ":/" so that
+// "sdmc:/" + "switch/" forms a proper path.
 static char *devices[] = {
     "sdmc:/",
+    "nand:/",
 };
 #else
 static char *devices[] = {

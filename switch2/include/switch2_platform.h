@@ -60,6 +60,11 @@ void switch2CtrlExit(void);
    Returns NULL only if no font at all could be opened. */
 struct vita2d_pgf *switch2LoadSystemFonts(void);
 
+/* Storage (psp2_io.c). Mounts the built-in user storage (the NAND) as the
+   fsdev device "nand", next to the SD card's "sdmc". Called once at start;
+   the libounce runtime unmounts all fsdev devices at exit. */
+void switch2MountNand(void);
+
 /* Battery (psp2_misc.c). Returns 0 and fills the fields if the power state
    service answered; the result is cached for a few seconds. */
 typedef struct {
