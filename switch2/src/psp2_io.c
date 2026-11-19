@@ -69,19 +69,31 @@ static void normalizePath(const char *path, char *out, size_t out_size) {
   }
 }
 
-/* Mount the built-in user storage (the NAND) as the fsdev device "nand",
- * so the browser and the FTP server see it next to the SD card ("sdmc").
- * The libounce runtime mounts "sdmc" itself at startup; the built-in
- * storage needs a separate mount: the fs service opens it as the user
- * content storage (the storage Switch 2 installs games and saves to),
- * and fsdev gives it a stdio name. Without it, or when opening fails,
- * OunceShell simply runs on the SD card alone. The runtime's own
- * shutdown (fsdevUnmountAll) unmounts it again. */
+/* Mount the BIS partitions as fsdev devices ("cal0", "safe", "user",
+ * "system") so the browser and the FTP server see them next to the SD
+ * card ("sdmc"). The libounce runtime mounts "sdmc" itself at startup;
+ * the built-in partitions need their own mounts: the fs service opens
+ * each BIS partition through fsOpenBisFileSystem, and fsdev gives it a
+ * stdio name. "user" is the user content storage (where games and saves
+ * live); the others are calibration, safe-mode and system. A partition
+ * that fails to open is simply skipped. The runtime's own shutdown
+ * (fsdevUnmountAll) unmounts them again. */
 void switch2MountNand(void) {
-  FsFileSystem fs;
-  Result rc = fsOpenContentStorageFileSystem(&fs, FsContentStorageId_User);
-  if (R_SUCCEEDED(rc))
-    fsdevMountDevice("nand", fs);
+  struct {
+    FsBisPartitionId id;
+    const char *mountName;
+  } partitions[] = {
+      {FsBisPartitionId_CalibrationFile, "cal0"},
+      {FsBisPartitionId_SafeMode, "safe"},
+      {FsBisPartitionId_User, "user"},
+      {FsBisPartitionId_System, "system"},
+  };
+
+  for (size_t i = 0; i < sizeof(partitions) / sizeof(partitions[0]); i++) {
+    FsFileSystem fs;
+    if (R_SUCCEEDED(fsOpenBisFileSystem(&fs, partitions[i].id, "")))
+      fsdevMountDevice(partitions[i].mountName, fs);
+  }
 }
 
 /* True for "dev:/" and "dev:", which stat may not describe. */
